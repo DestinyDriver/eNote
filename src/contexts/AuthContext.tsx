@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useRef,
+} from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
   user: User | null;
@@ -16,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
@@ -25,7 +31,9 @@ export const useAuth = () => {
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_DURATION = 30 * 1000; // 30 seconds
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,7 +44,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const initializeAuth = async () => {
     try {
       // Check cache first
-      if (sessionCache && Date.now() - sessionCache.timestamp < SESSION_CACHE_DURATION) {
+      if (
+        sessionCache &&
+        Date.now() - sessionCache.timestamp < SESSION_CACHE_DURATION
+      ) {
         setSession(sessionCache.session);
         setUser(sessionCache.session?.user ?? null);
         setLoading(false);
@@ -44,22 +55,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Get session from Supabase
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.getSession();
+
       if (error) {
-        console.error('Error getting session:', error);
+        console.error("Error getting session:", error);
       }
 
       // Update cache
       sessionCache = {
         session,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       setSession(session);
       setUser(session?.user ?? null);
     } catch (error) {
-      console.error('Auth initialization error:', error);
+      console.error("Auth initialization error:", error);
       setSession(null);
       setUser(null);
     } finally {
@@ -68,13 +82,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Handle auth state changes
-  const handleAuthStateChange = async (event: string, session: Session | null) => {
-    console.log('Auth state change:', event, session?.user?.email || 'no user');
+  const handleAuthStateChange = async (
+    event: string,
+    session: Session | null,
+  ) => {
+    console.log("Auth state change:", event, session?.user?.email || "no user");
 
     // Update cache
     sessionCache = {
       session,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     setSession(session);
@@ -83,21 +100,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Handle specific events
     switch (event) {
-      case 'SIGNED_IN':
-        console.log('User signed in');
+      case "SIGNED_IN":
+        console.log("User signed in");
         break;
-      case 'SIGNED_OUT':
-        console.log('User signed out');
+      case "SIGNED_OUT":
+        console.log("User signed out");
         // Clear any cached data
         sessionCache = null;
         try {
-          localStorage.removeItem('enote-notes-cache');
+          localStorage.removeItem("enote-notes-cache");
         } catch (error) {
-          console.warn('Failed to clear notes cache:', error);
+          console.warn("Failed to clear notes cache:", error);
         }
         break;
-      case 'TOKEN_REFRESHED':
-        console.log('Token refreshed');
+      case "TOKEN_REFRESHED":
+        console.log("Token refreshed");
         break;
     }
   };
@@ -117,7 +134,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Set up auth state listener only once
       if (!authListenerRef.current && mounted) {
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthStateChange);
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange(handleAuthStateChange);
         authListenerRef.current = subscription;
       }
     };
@@ -140,48 +159,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Only refresh if session is close to expiring or cache is stale
         const now = Date.now();
         const cacheAge = sessionCache ? now - sessionCache.timestamp : Infinity;
-        
+
         if (cacheAge > SESSION_CACHE_DURATION) {
           try {
             await supabase.auth.getSession();
           } catch (error) {
-            console.warn('Failed to refresh session on visibility change:', error);
+            console.warn(
+              "Failed to refresh session on visibility change:",
+              error,
+            );
           }
         }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [session]);
 
   const signInWithGoogle = async () => {
     try {
       setLoading(true);
-      
+
       // Get the correct redirect URL for production vs development
       const getRedirectUrl = () => {
         const baseUrl = window.location.origin;
-        
+
         // If we're in development, use localhost
-        if (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+        if (baseUrl.includes("localhost") || baseUrl.includes("127.0.0.1")) {
           return `${baseUrl}/notes`;
         }
-        
+
         // For production, use your deployed URL
-        return 'https://ekeepit.vercel.app/notes';
+        return `${import.meta.env.VITE_DEPLOYED_URL}/notes`;
       };
 
       const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
+        provider: "google",
         options: {
-          redirectTo: getRedirectUrl()
-        }
+          redirectTo: getRedirectUrl(),
+        },
       });
-      
+
       if (error) throw error;
     } catch (error) {
-      console.error('Sign in error:', error);
+      console.error("Sign in error:", error);
       setLoading(false);
       throw error;
     }
@@ -190,25 +213,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       setLoading(true);
-      
+
       // Clear cache before signing out
       sessionCache = null;
-      
+
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-      
+
       // Clear local storage
       try {
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('enote-')) {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith("enote-")) {
             localStorage.removeItem(key);
           }
         });
       } catch (error) {
-        console.warn('Failed to clear localStorage:', error);
+        console.warn("Failed to clear localStorage:", error);
       }
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error("Sign out error:", error);
       throw error;
     } finally {
       setLoading(false);
@@ -217,23 +240,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSession = async () => {
     try {
-      const { data: { session }, error } = await supabase.auth.refreshSession();
-      
+      const {
+        data: { session },
+        error,
+      } = await supabase.auth.refreshSession();
+
       if (error) {
-        console.error('Session refresh error:', error);
+        console.error("Session refresh error:", error);
         return;
       }
 
       // Update cache
       sessionCache = {
         session,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       setSession(session);
       setUser(session?.user ?? null);
     } catch (error) {
-      console.error('Failed to refresh session:', error);
+      console.error("Failed to refresh session:", error);
     }
   };
 
@@ -247,4 +273,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}; 
+};
